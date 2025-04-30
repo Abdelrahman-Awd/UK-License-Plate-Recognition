@@ -23,7 +23,6 @@ pip install numpy opencv-python pandas scipy roboflow
 ```
 
 Additionally, clone and install the SORT tracking algorithm:
-
 ```bash
 git clone https://github.com/abewley/sort.git
 ```
@@ -41,6 +40,8 @@ git clone https://github.com/abewley/sort.git
  ┣ 📜 util.py                  # Utility functions for license plate processing
  ┣ 📜 add_missing_data.py      # Interpolation for missing detections
  ┣ 📜 visualize.py             # Visualization script for results
+ ┣ 📜 test.csv                 # Raw detection results output
+ ┣ 📜 test_interpolated.csv    # Detection results with interpolated data
  ┣ 📜 yolov8n.pt               # Pre-trained YOLOv8 model for vehicle detection
  ┣ 📜 demo.gif                 # Demo of the system in action
  ┣ 📜 sample.mp4               # Sample video for testing
@@ -50,17 +51,13 @@ git clone https://github.com/abewley/sort.git
 ## 🔧 How It Works
 
 ### 1. Dataset Preparation
-
 The system uses a license plate dataset from Roboflow, downloaded with `dataset_download.py`. This specialized dataset ensures accurate detection of UK license plates.
 
 ### 2. Model Training
-
 A YOLOv8 model is trained specifically for license plate detection using `model_train.py`. The training process took approximately 10.5 hours on a GPU to complete 50 epochs.
 
 ### 3. Detection Pipeline
-
 The main detection pipeline in `main.py`:
-
 1. Detects vehicles using a pre-trained YOLOv8 model
 2. Tracks vehicles across frames using SORT algorithm
 3. Detects license plates using the custom-trained model
@@ -69,14 +66,12 @@ The main detection pipeline in `main.py`:
 6. Validates and corrects license plate text according to UK format
 
 ### 4. Post-Processing
-
-- `add_missing_data.py` performs linear interpolation to fill gaps in tracking data
+- `add_missing_data.py` performs linear interpolation to fill gaps in tracking data, generating `test_interpolated.csv` from the raw `test.csv` detection results
 - `visualize.py` creates an annotated video showing detection results with license plates and recognized text
+- The CSV files store structured data about detections, including frame numbers, vehicle IDs, bounding boxes, and license plate text with confidence scores
 
 ### 5. UK License Plate Format Validation
-
 The system implements specialized validation for UK license plates (2 letters + 2 numbers + 3 letters) and includes smart character mapping to correct common OCR errors:
-
 - 'O' ↔ '0'
 - 'I' ↔ '1'
 - 'J' ↔ '3'
@@ -91,7 +86,7 @@ The system achieves excellent detection and recognition results on UK license pl
 ## 🚗 Usage
 
 1. Ensure all dependencies are installed
-2. Place your input video as `sample.mp4` (or modify the path in `main.py`, and in `visualize.py`)
+2. Place your input video as `sample.mp4` (or modify the path in `main.py`)
 3. Run the main detection pipeline:
    ```bash
    python main.py
@@ -99,7 +94,6 @@ The system achieves excellent detection and recognition results on UK license pl
 4. View the results in `out.mp4`
 
 For training a new model on custom data:
-
 ```bash
 python dataset_download.py  # Download dataset from Roboflow
 python model_train.py       # Train YOLOv8 model
