@@ -1,5 +1,6 @@
 import subprocess
 import cv2
+import numpy as np
 from ultralytics import YOLO
 from sort.sort import *
 from util import *
