@@ -1,5 +1,7 @@
 # UK License Plate Recognition System
 
+## 📽️ Demo
+
 ![License Plate Recognition Demo](demo.gif)
 
 A comprehensive system for detecting and recognizing UK license plates in video footage using YOLOv8 object detection and OCR technology.
