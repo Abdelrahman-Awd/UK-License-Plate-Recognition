@@ -1,10 +1,23 @@
 import subprocess
 import sys
+
 import cv2
 import numpy as np
 from ultralytics import YOLO
+from ultralytics.engine.results import Results
+
 from sort.sort import *
 from util import *
+
+
+def detect(model, frame):
+    """Run a YOLO detection model on one frame and return its boxes as
+    [x1, y1, x2, y2, score, class_id] lists."""
+    # model(frame) returns a list with one Results per image; the type hints also
+    # allow generators/Tensors (stream=True etc.), so take the first item generically
+    result = next(iter(model(frame)))
+    assert isinstance(result, Results) and result.boxes is not None
+    return result.boxes.data.tolist()
 
 
 results = {}
@@ -30,21 +43,20 @@ while ret:
     if ret:
         results[frame_nmr] = {}
         # detect vehicles
-        detections = coco_model(frame)[0]
         detections_ = []
-        for detection in detections.boxes.data.tolist():
+        for detection in detect(coco_model, frame):
             x1, y1, x2, y2, score, class_id = detection
             if int(class_id) in vehicles:
                 detections_.append([x1, y1, x2, y2, score])
 
         # track vehicles
-        # SORT expects an (N, 5) array; pass an empty (0, 5) array when no vehicles are found
+        # SORT expects an (N, 5) array; pass an empty (0, 5) array when no vehicles are found.
+        # (Pylance infers dets must be exactly (0, 5) from SORT's default argument; false positive)
         track_ids = vehicle_tracker.update(
-            np.asarray(detections_) if detections_ else np.empty((0, 5)))
+            np.asarray(detections_) if detections_ else np.empty((0, 5)))  # pyright: ignore[reportArgumentType]
 
         # detect license plates
-        license_plates = license_plate_detector(frame)[0]
-        for license_plate in license_plates.boxes.data.tolist():
+        for license_plate in detect(license_plate_detector, frame):
             x1, y1, x2, y2, score, class_id = license_plate
 
             # assign license plate to car
