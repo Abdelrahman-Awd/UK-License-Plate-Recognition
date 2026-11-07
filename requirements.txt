@@ -1,0 +1,14 @@
+# Install PyTorch with CUDA first (see README), then: pip install -r requirements.txt
+# Exact versions that were verified to work: requirements-lock.txt
+ultralytics>=8.1,<9      # also installs opencv-python
+easyocr>=1.7,<2
+numpy>=1.24,<3
+pandas>=2.0
+scipy>=1.10
+roboflow>=1.1
+
+# Dependencies of the SORT tracker (git submodule: https://github.com/abewley/sort)
+filterpy==1.4.5
+scikit-image>=0.21
+matplotlib>=3.7
+lapx>=0.5,<1  # maintained, Windows-friendly build of `lap`; SORT falls back to scipy if missing

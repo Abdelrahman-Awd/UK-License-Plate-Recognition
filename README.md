@@ -15,19 +15,37 @@ A comprehensive system for detecting and recognizing UK license plates in video 
 - **Continuous Tracking**: Uses interpolation to maintain tracking even when detections are temporarily lost
 - **Visual Output**: Generates annotated video with vehicle tracking, license plate detection, and recognition results
 
-## 📋 Requirements
+## 📋 Installation
+
+The [SORT](https://github.com/abewley/sort) tracker is included as a **git submodule** (the original upstream repo, not modified), and the videos/GIF are stored with [Git LFS](https://git-lfs.com). Install Git LFS, then clone recursively:
 
 ```bash
-# Core dependencies
-pip install ultralytics
-pip install easyocr
-pip install numpy opencv-python pandas scipy roboflow
+git clone --recursive https://github.com/Abdelrahman-Awd/UK-License-Plate-Recognition.git
+cd UK-License-Plate-Recognition
+# already cloned without --recursive?  ->  git submodule update --init
+# videos missing / tiny text files?     ->  git lfs pull
 ```
 
-Additionally, clone and install the SORT tracking algorithm:
+Create a virtual environment (verified with Python 3.12; originally developed on 3.10):
+
 ```bash
-git clone https://github.com/abewley/sort.git
+python -m venv .venv
+# Windows:      .venv\Scripts\activate
+# Linux/macOS:  source .venv/bin/activate
 ```
+
+Install PyTorch with CUDA (for an NVIDIA GPU; pick the command for your CUDA version at [pytorch.org](https://pytorch.org/get-started/locally/)), then the rest:
+
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+pip install -r requirements.txt
+# or, for the exact versions that were verified to work (includes CUDA 12.1 torch):
+# pip install -r requirements-lock.txt
+```
+
+Without a GPU, a plain `pip install torch torchvision` works too: detection, OCR and training fall back to CPU (inference is slower; training on CPU is very slow).
+
+> `sort/sort.py` sets `matplotlib.use('TkAgg')` on import, so Python needs `tkinter` (included in the standard python.org Windows installer; on Linux install `python3-tk`). On a headless Linux server (no display) the import fails; run with `xvfb-run python main.py`.
 
 ## 🛠️ Project Structure
 
@@ -35,18 +53,21 @@ git clone https://github.com/abewley/sort.git
 📦 UK-License-Plate-Recognition
  ┣ 📂 runs/detect/train/weights/
  ┃ ┗ 📜 best.pt                # Custom trained YOLOv8 model for license plates
- ┣ 📂 sort/                    # SORT tracking algorithm
+ ┣ 📂 sort/                    # SORT tracker (git submodule -> abewley/sort)
+ ┣ 📜 requirements.txt         # Python dependencies (version ranges)
+ ┣ 📜 requirements-lock.txt    # Exact versions verified to work
  ┣ 📜 dataset_download.py      # Script to download dataset from Roboflow
  ┣ 📜 model_train.py           # Script to train YOLOv8 on license plate dataset
  ┣ 📜 main.py                  # Main detection and processing pipeline
  ┣ 📜 util.py                  # Utility functions for license plate processing
  ┣ 📜 add_missing_data.py      # Interpolation for missing detections
  ┣ 📜 visualize.py             # Visualization script for results
- ┣ 📜 test.csv                 # Raw detection results output
- ┣ 📜 test_interpolated.csv    # Detection results with interpolated data
+ ┣ 📜 test.csv                 # Raw detection results (generated, not committed)
+ ┣ 📜 test_interpolated.csv    # Interpolated results (generated, not committed)
+ ┣ 📜 out.mp4                  # Annotated output video (generated, not committed)
  ┣ 📜 yolov8n.pt               # Pre-trained YOLOv8 model for vehicle detection
- ┣ 📜 demo.gif                 # Demo of the system in action
- ┣ 📜 sample.mp4               # Sample video for testing
+ ┣ 📜 demo.gif                 # Demo of the system in action (Git LFS)
+ ┣ 📜 sample.mp4               # Sample video for testing (Git LFS)
  ┗ 📜 README.md                # Project documentation
 ```
 
@@ -73,7 +94,7 @@ The main detection pipeline in `main.py`:
 - The CSV files store structured data about detections, including frame numbers, vehicle IDs, bounding boxes, and license plate text with confidence scores
 
 ### 5. UK License Plate Format Validation
-The system implements specialized validation for UK license plates (2 letters + 2 numbers + 3 letters) and includes smart character mapping to correct common OCR errors:
+The system implements specialized validation for current-style UK license plates (2 letters + 2 numbers + 3 letters; older and personalised formats are not recognised) and includes smart character mapping to correct common OCR errors:
 - 'O' ↔ '0'
 - 'I' ↔ '1'
 - 'J' ↔ '3'
@@ -88,16 +109,18 @@ The system achieves excellent detection and recognition results on UK license pl
 ## 🚗 Usage
 
 1. Ensure all dependencies are installed
-2. Place your input video as `sample.mp4` (or modify the path in `main.py`)
-3. Run the main detection pipeline:
+2. Run the main detection pipeline on `sample.mp4`, or pass your own video:
    ```bash
-   python main.py
+   python main.py                  # uses sample.mp4
+   python main.py path/to/video.mp4
    ```
-4. View the results in `out.mp4`
+   `main.py` writes `test.csv`, then runs `add_missing_data.py` and `visualize.py` automatically.
+3. View the results in `out.mp4`
 
-For training a new model on custom data:
+For training a new model on custom data (needs a free [Roboflow API key](https://app.roboflow.com/settings/api)):
 ```bash
-python dataset_download.py  # Download dataset from Roboflow
+# PowerShell: $env:ROBOFLOW_API_KEY="your-key"    bash: export ROBOFLOW_API_KEY=your-key
+python dataset_download.py  # Download dataset from Roboflow into ./License-Plate-Recognition-4
 python model_train.py       # Train YOLOv8 model
 ```
 

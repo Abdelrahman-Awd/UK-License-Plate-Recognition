@@ -1,4 +1,5 @@
 import subprocess
+import sys
 import cv2
 import numpy as np
 from ultralytics import YOLO
@@ -8,13 +9,16 @@ from util import *
 
 results = {}
 
-vehicle_tracker = Sort()
+# max_age: frames a track survives without a detection (default 1 splits one car into many IDs)
+vehicle_tracker = Sort(max_age=30, min_hits=3)
 
 
 # load models
 coco_model = YOLO('yolov8n.pt')
 license_plate_detector = YOLO('./runs/detect/train/weights/best.pt')
-cap = cv2.VideoCapture('./sample.mp4')
+# input video: python main.py [video_path]  (default: sample.mp4)
+video_path = sys.argv[1] if len(sys.argv) > 1 else './sample.mp4'
+cap = cv2.VideoCapture(video_path)
 
 vehicles = [2, 3, 5, 7]
 # read frames
@@ -34,7 +38,9 @@ while ret:
                 detections_.append([x1, y1, x2, y2, score])
 
         # track vehicles
-        track_ids = vehicle_tracker.update(np.asarray(detections_))
+        # SORT expects an (N, 5) array; pass an empty (0, 5) array when no vehicles are found
+        track_ids = vehicle_tracker.update(
+            np.asarray(detections_) if detections_ else np.empty((0, 5)))
 
         # detect license plates
         license_plates = license_plate_detector(frame)[0]
@@ -48,8 +54,10 @@ while ret:
             if car_id != -1:
 
                 # crop license plate
-                license_plate_crop = frame[int(
-                    y1):int(y2), int(x1): int(x2), :]
+                license_plate_crop = frame[max(int(y1), 0):int(y2),
+                                           max(int(x1), 0):int(x2), :]
+                if license_plate_crop.size == 0:
+                    continue
 
                 # process license plate
                 license_plate_crop_gray = cv2.cvtColor(
@@ -68,12 +76,14 @@ while ret:
                                                                     'bbox_score': score,
                                                                     'text_score': license_plate_text_score}}
 
+cap.release()
+
 # write results
 write_csv(results, './test.csv')
 
 
-# Run the interpolation script
-subprocess.run(["python", "add_missing_data.py"], check=True)
+# Run the interpolation script (sys.executable = the same Python/venv running this script)
+subprocess.run([sys.executable, "add_missing_data.py"], check=True)
 
 # Run the visualization script
-subprocess.run(["python", "visualize.py"], check=True)
+subprocess.run([sys.executable, "visualize.py", video_path], check=True)

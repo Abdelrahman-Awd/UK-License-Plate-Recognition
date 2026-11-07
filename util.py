@@ -1,8 +1,9 @@
 import string
 import easyocr
+import torch
 
-# Initialize the OCR reader
-reader = easyocr.Reader(['en'], gpu=True)
+# Initialize the OCR reader (uses the GPU only if CUDA is available)
+reader = easyocr.Reader(['en'], gpu=torch.cuda.is_available())
 
 # Mapping dictionaries for character conversion
 dict_char_to_int = {'O': '0',
@@ -35,7 +36,6 @@ def write_csv(results, output_path):
 
         for frame_nmr in results.keys():
             for car_id in results[frame_nmr].keys():
-                print(results[frame_nmr][car_id])
                 if 'car' in results[frame_nmr][car_id].keys() and \
                    'license_plate' in results[frame_nmr][car_id].keys() and \
                    'text' in results[frame_nmr][car_id]['license_plate'].keys():
