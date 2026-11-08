@@ -104,7 +104,18 @@ The system implements specialized validation for current-style UK license plates
 
 ## 📊 Performance
 
-The system achieves excellent detection and recognition results on UK license plates. The custom-trained YOLOv8 model combined with specialized OCR processing and format validation ensures high accuracy even in challenging conditions.
+License plate detector (YOLOv8n, 50 epochs, 640px, batch 16), on the Roboflow validation set:
+
+| Metric | Value |
+|---|---|
+| Precision | 0.975 |
+| Recall | 0.959 |
+| mAP@50 | 0.982 |
+| mAP@50-95 | 0.694 |
+
+Training curves, PR curve and confusion matrix are in [`runs/detect/train/`](runs/detect/train/).
+
+> These are plate *detection* metrics. End-to-end OCR accuracy (full plate read correctly) has not been formally benchmarked yet.
 
 ## 🚗 Usage
 
