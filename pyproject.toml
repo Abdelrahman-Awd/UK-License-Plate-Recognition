@@ -1,0 +1,39 @@
+[project]
+name = "uk-license-plate-recognition"
+version = "0.1.0"
+description = "UK license plate recognition on video: YOLOv8 + SORT + EasyOCR"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "torch>=2.5,<2.6",
+    "torchvision>=0.20,<0.21",
+    "ultralytics>=8.1,<9", # also installs opencv-python
+    "easyocr>=1.7,<2",
+    "numpy>=1.24,<3",
+    "pandas>=2.0",
+    "scipy>=1.10",
+    # Dependencies of the SORT tracker (git submodule: https://github.com/abewley/sort)
+    "filterpy==1.4.5",
+    "scikit-image>=0.21",
+    "matplotlib>=3.7",
+    "lapx>=0.5,<1", # maintained, Windows-friendly build of `lap`
+]
+
+[dependency-groups]
+# Only needed by dataset_download.py (training data from Roboflow)
+train = ["roboflow>=1.1"]
+
+[tool.uv]
+package = false # a set of scripts, not an installable package
+default-groups = ["train"]
+
+# CUDA 12.1 builds of torch/torchvision on Windows/Linux; macOS uses the default PyPI wheels.
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu121", marker = "sys_platform != 'darwin'" }]
+torchvision = [{ index = "pytorch-cu121", marker = "sys_platform != 'darwin'" }]

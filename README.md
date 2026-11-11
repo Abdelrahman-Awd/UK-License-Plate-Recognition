@@ -26,26 +26,30 @@ cd UK-License-Plate-Recognition
 # videos missing / tiny text files?     ->  git lfs pull
 ```
 
-Create a virtual environment (verified with Python 3.12; originally developed on 3.10):
+Dependencies are managed with [uv](https://docs.astral.sh/uv/getting-started/installation/). Install it, then from the project folder:
+
+```bash
+uv sync
+```
+
+This creates `.venv` with Python 3.12 (uv downloads it if needed) and installs the exact versions from `uv.lock`, including PyTorch built for CUDA 12.1 on Windows/Linux (on macOS the standard PyPI build is used). Add `--no-group train` to skip `roboflow`, which is only needed to download the training dataset.
+
+Without an NVIDIA GPU the CUDA build still works: detection, OCR and training fall back to CPU (inference is slower; training on CPU is very slow).
+
+<details>
+<summary>Without uv (plain pip)</summary>
+
+`requirements.txt` is generated from `uv.lock` and points pip at the CUDA 12.1 PyTorch index:
 
 ```bash
 python -m venv .venv
 # Windows:      .venv\Scripts\activate
 # Linux/macOS:  source .venv/bin/activate
-```
-
-Install PyTorch with CUDA (for an NVIDIA GPU; pick the command for your CUDA version at [pytorch.org](https://pytorch.org/get-started/locally/)), then the rest:
-
-```bash
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 pip install -r requirements.txt
-# or, for the exact versions that were verified to work (includes CUDA 12.1 torch):
-# pip install -r requirements-lock.txt
 ```
+</details>
 
-Without a GPU, a plain `pip install torch torchvision` works too: detection, OCR and training fall back to CPU (inference is slower; training on CPU is very slow).
-
-> `sort/sort.py` sets `matplotlib.use('TkAgg')` on import, so Python needs `tkinter` (included in the standard python.org Windows installer; on Linux install `python3-tk`). On a headless Linux server (no display) the import fails; run with `xvfb-run python main.py`.
+> `sort/sort.py` sets `matplotlib.use('TkAgg')` on import, so Python needs `tkinter` (included in uv's managed Python and the python.org Windows installer; on Linux install `python3-tk`). On a headless Linux server (no display) the import fails; run with `xvfb-run uv run main.py`.
 
 ## 🛠️ Project Structure
 
@@ -54,8 +58,9 @@ Without a GPU, a plain `pip install torch torchvision` works too: detection, OCR
  ┣ 📂 runs/detect/train/weights/
  ┃ ┗ 📜 best.pt                # Custom trained YOLOv8 model for license plates
  ┣ 📂 sort/                    # SORT tracker (git submodule -> abewley/sort)
- ┣ 📜 requirements.txt         # Python dependencies (version ranges)
- ┣ 📜 requirements-lock.txt    # Exact versions verified to work
+ ┣ 📜 pyproject.toml           # Project metadata and dependencies (uv)
+ ┣ 📜 uv.lock                  # Exact locked versions (uv)
+ ┣ 📜 requirements.txt         # pip fallback, generated from uv.lock
  ┣ 📜 dataset_download.py      # Script to download dataset from Roboflow
  ┣ 📜 model_train.py           # Script to train YOLOv8 on license plate dataset
  ┣ 📜 main.py                  # Main detection and processing pipeline
@@ -122,8 +127,8 @@ Training curves, PR curve and confusion matrix are in [`runs/detect/train/`](run
 1. Ensure all dependencies are installed
 2. Run the main detection pipeline on `sample.mp4`, or pass your own video:
    ```bash
-   python main.py                  # uses sample.mp4
-   python main.py path/to/video.mp4
+   uv run main.py                  # uses sample.mp4
+   uv run main.py path/to/video.mp4
    ```
    `main.py` writes `test.csv`, then runs `add_missing_data.py` and `visualize.py` automatically.
 3. View the results in `out.mp4`
@@ -131,8 +136,8 @@ Training curves, PR curve and confusion matrix are in [`runs/detect/train/`](run
 For training a new model on custom data (needs a free [Roboflow API key](https://app.roboflow.com/settings/api)):
 ```bash
 # PowerShell: $env:ROBOFLOW_API_KEY="your-key"    bash: export ROBOFLOW_API_KEY=your-key
-python dataset_download.py  # Download dataset from Roboflow into ./License-Plate-Recognition-4
-python model_train.py       # Train YOLOv8 model
+uv run dataset_download.py  # Download dataset from Roboflow into ./License-Plate-Recognition-4
+uv run model_train.py       # Train YOLOv8 model
 ```
 
 ## 📝 License
