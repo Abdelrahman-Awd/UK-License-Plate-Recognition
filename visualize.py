@@ -33,6 +33,21 @@ def parse_bbox(value):
     return [float(v) for v in str(value).strip().strip('[]').split()]
 
 
+def vote_plate(texts, scores):
+    """Combine many OCR reads of one plate into a single string.
+
+    For each character position, add up the OCR scores of every read that has a
+    given character there and keep the character with the highest total. This
+    is much more robust than trusting the single highest-scoring read, whose
+    confidence is often a noisy outlier (e.g. 'LM15ZZC' beating 26 'LN15ZZC' reads).
+    """
+    totals = [{} for _ in range(7)]
+    for text, score in zip(texts, scores):
+        for i, char in enumerate(text):
+            totals[i][char] = totals[i].get(char, 0.0) + score
+    return ''.join(max(t, key=lambda c: t[c]) for t in totals)
+
+
 results = pd.read_csv('./test_interpolated.csv')
 
 # load video (path can be passed by main.py: python visualize.py <video>)
@@ -52,9 +67,20 @@ TEXT_BOX = 300      # height of the white box holding the plate text
 license_plate = {}
 for car_id in np.unique(results['car_id']):
     car_rows = results[results['car_id'] == car_id]
-    best = car_rows.loc[car_rows['license_number_score'].idxmax()]
+    # only real OCR reads: interpolated rows have license_number '0' and score 0
+    texts = car_rows['license_number'].astype(str)
+    scores = pd.to_numeric(car_rows['license_number_score'], errors='coerce').fillna(0)
+    reads = (texts.str.len() == 7) & (scores > 0)
+    if not reads.any():
+        continue
+    texts, scores = texts[reads], scores[reads]
+    plate_number = vote_plate(texts, scores)
+
+    # crop from the best read that matches the voted plate (fallback: best read overall)
+    matching = scores[texts == plate_number]
+    best = results.loc[(matching if len(matching) else scores).idxmax()]
     license_plate[car_id] = {'license_crop': None,
-                             'license_plate_number': str(best['license_number'])}
+                             'license_plate_number': plate_number}
 
     cap.set(cv2.CAP_PROP_POS_FRAMES, int(best['frame_nmr']))
     ret, frame = cap.read()
