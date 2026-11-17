@@ -1,9 +1,21 @@
+import re
 import string
-import easyocr
-import torch
 
-# Initialize the OCR reader (uses the GPU only if CUDA is available)
-reader = easyocr.Reader(['en'], gpu=torch.cuda.is_available())
+import cv2
+import numpy as np
+import onnxruntime as ort
+import torch  # noqa: F401  loads torch's CUDA 12 / cuDNN 9 DLLs, which onnxruntime-gpu reuses
+from fast_plate_ocr import LicensePlateRecognizer
+
+# Plate-specific OCR model (ONNX). Runs on the GPU when CUDA is available,
+# otherwise on the CPU. The ~5 MB weights are downloaded and cached on first use.
+# It reads UK plates far more reliably than a general-purpose OCR, e.g. the 'W'
+# in 'EY09 VWS' that EasyOCR read as V/O/U.
+# (device='auto' tries TensorRT first and drops to CPU when it is missing, so
+# request CUDA explicitly when this onnxruntime build has it)
+_providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] \
+    if 'CUDAExecutionProvider' in ort.get_available_providers() else ['CPUExecutionProvider']
+reader = LicensePlateRecognizer('cct-s-v2-global-model', providers=_providers)
 
 # Mapping dictionaries for character conversion
 dict_char_to_int = {'O': '0',
@@ -11,14 +23,22 @@ dict_char_to_int = {'O': '0',
                     'J': '3',
                     'A': '4',
                     'G': '6',
-                    'S': '5'}
+                    'S': '5',
+                    'Z': '2',
+                    'B': '8',
+                    'D': '0',
+                    'Q': '0',
+                    'T': '7'}
 
 dict_int_to_char = {'0': 'O',
                     '1': 'I',
                     '3': 'J',
                     '4': 'A',
                     '6': 'G',
-                    '5': 'S'}
+                    '5': 'S',
+                    '2': 'Z',
+                    '8': 'B',
+                    '7': 'T'}
 
 
 def write_csv(results, output_path):
@@ -110,22 +130,25 @@ def read_license_plate(license_plate_crop):
     Read the license plate text from the given cropped image.
 
     Args:
-        license_plate_crop (PIL.Image.Image): Cropped image containing the license plate.
+        license_plate_crop (numpy.ndarray): BGR crop (as read by OpenCV) containing the license plate.
 
     Returns:
-        tuple: Tuple containing the formatted license plate text and its confidence score.
+        tuple: Tuple containing the formatted license plate text and its confidence
+        score (mean per-character confidence), or (None, None) if the read is not a
+        valid UK plate.
     """
-    detections = reader.readtext(license_plate_crop)
+    prediction = reader.run(cv2.cvtColor(license_plate_crop, cv2.COLOR_BGR2RGB),
+                            return_confidence=True)[0]
 
-    for detection in detections:
-        bbox, text, score = detection
+    # keep only letters/digits (the model can emit separators/padding)
+    raw = str(prediction.plate).upper()
+    text = re.sub(r'[^A-Z0-9]', '', raw)
+    if not license_complies_UK_format(text):
+        return None, None
 
-        text = text.upper().replace(" ", "")
-
-        if license_complies_UK_format(text):
-            return format_license(text), score
-
-    return None, None
+    probs = prediction.char_probs
+    score = float(np.mean(probs[:len(raw)])) if probs is not None and len(raw) else 0.0
+    return format_license(text), score
 
 
 def get_car(license_plate, vehicle_track_ids):

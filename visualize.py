@@ -33,18 +33,21 @@ def parse_bbox(value):
     return [float(v) for v in str(value).strip().strip('[]').split()]
 
 
-def vote_plate(texts, scores):
+def vote_plate(texts, scores, weights):
     """Combine many OCR reads of one plate into a single string.
 
-    For each character position, add up the OCR scores of every read that has a
+    For each character position, add up score * weight of every read that has a
     given character there and keep the character with the highest total. This
     is much more robust than trusting the single highest-scoring read, whose
     confidence is often a noisy outlier (e.g. 'LM15ZZC' beating 26 'LN15ZZC' reads).
+    The caller passes the squared plate width (proportional to the plate's pixel
+    area): reads of larger, closer plates are far more accurate than reads of
+    small, distant ones (e.g. a van's '9' is read as '6' mostly when far away).
     """
     totals = [{} for _ in range(7)]
-    for text, score in zip(texts, scores):
+    for text, score, weight in zip(texts, scores, weights):
         for i, char in enumerate(text):
-            totals[i][char] = totals[i].get(char, 0.0) + score
+            totals[i][char] = totals[i].get(char, 0.0) + score * weight
     return ''.join(max(t, key=lambda c: t[c]) for t in totals)
 
 
@@ -63,6 +66,9 @@ out = cv2.VideoWriter('./out.mp4', fourcc, fps, (width, height))
 CROP_HEIGHT = 400   # height of the enlarged plate crop shown above each car
 CROP_GAP = 100      # gap between the car box and the plate crop
 TEXT_BOX = 300      # height of the white box holding the plate text
+# OCR reads below this mean character confidence are ignored, so unreadable
+# (blurred/distant) plates get no text instead of a confident-looking wrong one
+MIN_READ_SCORE = 0.6
 
 license_plate = {}
 for car_id in np.unique(results['car_id']):
@@ -70,11 +76,13 @@ for car_id in np.unique(results['car_id']):
     # only real OCR reads: interpolated rows have license_number '0' and score 0
     texts = car_rows['license_number'].astype(str)
     scores = pd.to_numeric(car_rows['license_number_score'], errors='coerce').fillna(0)
-    reads = (texts.str.len() == 7) & (scores > 0)
+    reads = (texts.str.len() == 7) & (scores >= MIN_READ_SCORE)
     if not reads.any():
         continue
     texts, scores = texts[reads], scores[reads]
-    plate_number = vote_plate(texts, scores)
+    widths = car_rows.loc[reads, 'license_plate_bbox'].map(
+        lambda b: max(parse_bbox(b)[2] - parse_bbox(b)[0], 0.0))
+    plate_number = vote_plate(texts, scores, widths ** 2)
 
     # crop from the best read that matches the voted plate (fallback: best read overall)
     matching = scores[texts == plate_number]

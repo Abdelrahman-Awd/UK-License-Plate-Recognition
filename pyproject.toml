@@ -1,7 +1,7 @@
 [project]
 name = "uk-license-plate-recognition"
 version = "0.1.0"
-description = "UK license plate recognition on video: YOLOv8 + SORT + EasyOCR"
+description = "UK license plate recognition on video: YOLOv8 + SORT + fast-plate-ocr"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10,<3.13"
@@ -9,7 +9,6 @@ dependencies = [
     "torch>=2.5,<2.6",
     "torchvision>=0.20,<0.21",
     "ultralytics>=8.1,<9", # also installs opencv-python
-    "easyocr>=1.7,<2",
     "numpy>=1.24,<3",
     "pandas>=2.0",
     "scipy>=1.10",
@@ -18,6 +17,11 @@ dependencies = [
     "scikit-image>=0.21",
     "matplotlib>=3.7",
     "lapx>=0.5,<1", # maintained, Windows-friendly build of `lap`
+    # GPU build of ONNX Runtime (uses the CUDA 12 / cuDNN 9 DLLs shipped with torch); macOS has no GPU build
+    "fast-plate-ocr[onnx-gpu]>=1.1,<2; sys_platform != 'darwin'",
+    "fast-plate-ocr[onnx]>=1.1,<2; sys_platform == 'darwin'",
+    # onnxruntime-gpu >= 1.27 is built for CUDA 13; torch 2.5 cu121 ships CUDA 12 DLLs
+    "onnxruntime-gpu>=1.22,<1.27; sys_platform != 'darwin'",
 ]
 
 [dependency-groups]

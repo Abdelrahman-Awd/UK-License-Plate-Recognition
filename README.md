@@ -34,7 +34,7 @@ uv sync
 
 This creates `.venv` with Python 3.12 (uv downloads it if needed) and installs the exact versions from `uv.lock`, including PyTorch built for CUDA 12.1 on Windows/Linux (on macOS the standard PyPI build is used). Add `--no-group train` to skip `roboflow`, which is only needed to download the training dataset.
 
-Without an NVIDIA GPU the CUDA build still works: detection, OCR and training fall back to CPU (inference is slower; training on CPU is very slow).
+Without an NVIDIA GPU the CUDA build still works: detection, OCR and training fall back to CPU (inference is slower; training on CPU is very slow). On macOS the CPU build of ONNX Runtime is installed for the OCR.
 
 <details>
 <summary>Without uv (plain pip)</summary>
@@ -90,7 +90,7 @@ The main detection pipeline in `main.py`:
 2. Tracks vehicles across frames using SORT algorithm
 3. Detects license plates using the custom-trained model
 4. Associates license plates with vehicles
-5. Processes license plate crops and extracts text using OCR
+5. Reads the text of each plate crop with [fast-plate-ocr](https://github.com/ankandrew/fast-plate-ocr) (`cct-s-v2-global-model`, a plate-specific ONNX model that runs on the GPU via `onnxruntime-gpu`, reusing the CUDA 12 / cuDNN 9 libraries bundled with PyTorch; its ~5 MB weights are downloaded and cached on the first run)
 6. Validates and corrects license plate text according to UK format
 
 ### 4. Post-Processing
@@ -106,6 +106,12 @@ The system implements specialized validation for current-style UK license plates
 - 'A' ↔ '4'
 - 'G' ↔ '6'
 - 'S' ↔ '5'
+- 'Z' ↔ '2'
+- 'B' ↔ '8'
+- 'T' ↔ '7'
+- 'D', 'Q' → '0' (in digit positions)
+
+Non-alphanumeric characters in OCR output are removed before validation. The plate text shown for each car comes from a per-character vote across all its valid reads, weighted by OCR confidence (mean per-character probability) and plate size (width², since closer plates read more reliably).
 
 ## 📊 Performance
 
@@ -149,4 +155,4 @@ This project is released under the MIT License.
 - [Roboflow](https://roboflow.com) for providing the License Plate Recognition dataset
 - [Ultralytics](https://github.com/ultralytics/ultralytics) for YOLOv8
 - [SORT](https://github.com/abewley/sort) for the tracking algorithm
-- [EasyOCR](https://github.com/JaidedAI/EasyOCR) for OCR capabilities
+- [fast-plate-ocr](https://github.com/ankandrew/fast-plate-ocr) for license plate OCR
